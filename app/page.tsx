@@ -48,7 +48,7 @@ const whyCards = [
   {
     icon: '🔍',
     title: 'Ærlig og transparent',
-    desc: 'Vi gir deg all info om bilen, uten skjulte overraskelser. Det vi lover, leverer vi.',
+    desc: 'Vi gir deg all info om bilen, uten skjulte overraskelser.',
   },
   {
     icon: '⚡',
@@ -58,12 +58,12 @@ const whyCards = [
   {
     icon: '☕',
     title: 'Personlig service',
-    desc: 'Vi henter deg på Torp flyplass, byr på kaffe og kjeks — vi tar godt vare på deg.',
+    desc: 'Vi henter deg på Torp flyplass eller Sandefjord stasjon',
   },
   {
     icon: '🛡️',
     title: 'Bruktbilgaranti',
-    desc: 'Alle biler leveres med garanti. Du er trygg også etter at du har kjørt hjem.',
+    desc: 'Vi kan levere med garanti.',
   },
 ]
 
@@ -156,10 +156,10 @@ export default function HomePage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-[#2471c8] mb-2">Vårt utvalg</p>
             <h2 className="text-2xl md:text-3xl font-extrabold text-[#1a3a5c] mb-4">
-              Kvalitetssikrede biler — alltid et godt utvalg
+              Gunstige bruktbiler — alltid et godt utvalg
             </h2>
             <p className="text-[#5a7a9a] mb-7 leading-relaxed">
-              Vi importerer og selger bruktbiler med fokus på kvalitet og ærlighet. Alle biler er kontrollert og leveres med bruktbilgaranti.
+              Vi selger bruktbiler med fokus på konkurransedyktige priser. 
             </p>
             <div className="flex flex-wrap gap-3">
               <Link

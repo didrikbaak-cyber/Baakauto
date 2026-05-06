@@ -106,19 +106,9 @@ export default function KontaktPage() {
               Åpne i Google Maps ↗
             </a>
 
-            {/* Bilde av lokalet */}
-            <div className="relative h-52 rounded-2xl overflow-hidden shadow-sm">
-              <Image
-                src="/forside-bygg.jpg"
-                alt="Baak Auto AS — Hinderveien 7, Sandefjord"
-                fill
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 50vw"
-              />
-            </div>
           </div>
 
-          {/* RIGHT: Profilkort + Kontaktskjema */}
+          {/* RIGHT: Profilkort + Bilde + Kontaktskjema */}
           <div className="space-y-6">
             <div className="bg-white border border-[#ccdcee] rounded-2xl p-6 flex items-center gap-5">
               <div className="relative w-20 h-20 flex-shrink-0">
@@ -141,6 +131,16 @@ export default function KontaktPage() {
                   📞 47 68 03 95
                 </a>
               </div>
+            </div>
+            {/* Bilde av lokalet */}
+            <div className="relative h-48 rounded-2xl overflow-hidden shadow-sm">
+              <Image
+                src="/forside-bygg.jpg"
+                alt="Baak Auto AS — Hinderveien 7, Sandefjord"
+                fill
+                className="object-cover"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+              />
             </div>
             <ContactForm />
           </div>

@@ -6,7 +6,7 @@ import { useState } from 'react'
 
 const links = [
   { href: '/', label: 'Hjem' },
-  { href: '/biler', label: 'Våre biler' },
+  { href: 'https://www.finn.no/mobility/search/car?q=baak+auto', label: 'Våre biler', external: true },
   { href: '/innbytte', label: 'Innbytte' },
   { href: '/selg', label: 'Selg din bil' },
   { href: '/kontakt', label: 'Kontakt' },
@@ -26,17 +26,27 @@ export default function Navbar() {
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-7">
           {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`text-sm font-medium transition-colors ${
-                pathname === l.href
-                  ? 'text-[#1a3a5c]'
-                  : 'text-[#5a7a9a] hover:text-[#1a3a5c]'
-              }`}
-            >
-              {l.label}
-            </Link>
+            l.external ? (
+              <a
+                key={l.href}
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium transition-colors text-[#5a7a9a] hover:text-[#1a3a5c]"
+              >
+                {l.label}
+              </a>
+            ) : (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`text-sm font-medium transition-colors ${
+                  pathname === l.href ? 'text-[#1a3a5c]' : 'text-[#5a7a9a] hover:text-[#1a3a5c]'
+                }`}
+              >
+                {l.label}
+              </Link>
+            )
           ))}
           <Link
             href="/kontakt"
@@ -62,16 +72,29 @@ export default function Navbar() {
       {menuOpen && (
         <div className="md:hidden bg-white border-t border-[#ccdcee] px-4 py-4 flex flex-col gap-3">
           {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              onClick={() => setMenuOpen(false)}
-              className={`text-sm font-medium py-2 border-b border-[#e4edf6] ${
-                pathname === l.href ? 'text-[#1a3a5c] font-bold' : 'text-[#5a7a9a]'
-              }`}
-            >
-              {l.label}
-            </Link>
+            l.external ? (
+              <a
+                key={l.href}
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+                className="text-sm font-medium py-2 border-b border-[#e4edf6] text-[#5a7a9a]"
+              >
+                {l.label}
+              </a>
+            ) : (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setMenuOpen(false)}
+                className={`text-sm font-medium py-2 border-b border-[#e4edf6] ${
+                  pathname === l.href ? 'text-[#1a3a5c] font-bold' : 'text-[#5a7a9a]'
+                }`}
+              >
+                {l.label}
+              </Link>
+            )
           ))}
           <Link
             href="/kontakt"

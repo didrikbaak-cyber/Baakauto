@@ -94,12 +94,14 @@ export default function HomePage() {
             Bruktbilforhandler i Sandefjord — ærlig, rask og personlig service
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
-            <Link
-              href="/biler"
+            <a
+              href="https://www.finn.no/mobility/search/car?q=baak+auto"
+              target="_blank"
+              rel="noopener noreferrer"
               className="bg-white text-[#1a3a5c] font-bold px-8 py-3.5 rounded-lg shadow-lg hover:-translate-y-0.5 hover:shadow-xl transition-all text-base"
             >
               Se våre biler
-            </Link>
+            </a>
             <Link
               href="/selg"
               className="bg-transparent border-2 border-white/50 hover:border-white hover:bg-white/12 text-white font-bold px-8 py-3.5 rounded-lg transition-all text-base"
@@ -162,12 +164,14 @@ export default function HomePage() {
               Vi selger bruktbiler med fokus på konkurransedyktige priser. 
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link
-                href="/biler"
+              <a
+                href="https://www.finn.no/mobility/search/car?q=baak+auto"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="bg-[#1e5fa8] hover:bg-[#2471c8] text-white font-bold px-6 py-3 rounded-lg transition-colors"
               >
                 Se alle biler
-              </Link>
+              </a>
               <Link
                 href="/innbytte"
                 className="border-2 border-[#ccdcee] hover:border-[#1e5fa8] text-[#1a3a5c] font-bold px-6 py-3 rounded-lg transition-colors"

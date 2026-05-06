@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
+import { google } from 'googleapis'
+import { Readable } from 'stream'
 
 const labelMap: Record<string, string> = {
   merke: 'Merke',
@@ -27,6 +29,50 @@ async function sendTelegram(text: string) {
   })
 }
 
+async function uploadToDrive(
+  filename: string,
+  buffer: Buffer,
+  mimeType: string,
+  folderId: string
+): Promise<string | null> {
+  try {
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/drive'],
+    })
+
+    const drive = google.drive({ version: 'v3', auth })
+
+    const res = await drive.files.create({
+      requestBody: {
+        name: filename,
+        parents: [folderId],
+      },
+      media: {
+        mimeType,
+        body: Readable.from(buffer),
+      },
+      fields: 'id',
+    })
+
+    const fileId = res.data.id!
+
+    // Gjør filen tilgjengelig for alle med lenken
+    await drive.permissions.create({
+      fileId,
+      requestBody: { role: 'reader', type: 'anyone' },
+    })
+
+    return `https://drive.google.com/file/d/${fileId}/view`
+  } catch (err) {
+    console.error('[Google Drive upload]', err)
+    return null
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const data = await req.formData()
@@ -41,10 +87,20 @@ export async function POST(req: NextRequest) {
 
     const attachments: { filename: string; content: Buffer }[] = []
     const bilderEntries = data.getAll('bilder')
+
+    // Last opp til Google Drive
+    const driveLinks: string[] = []
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
+
     for (const entry of bilderEntries) {
       if (entry instanceof File && entry.size > 0) {
         const buf = Buffer.from(await entry.arrayBuffer())
         attachments.push({ filename: entry.name, content: buf })
+
+        if (folderId) {
+          const link = await uploadToDrive(entry.name, buf, entry.type || 'image/jpeg', folderId)
+          if (link) driveLinks.push(link)
+        }
       }
     }
 
@@ -70,8 +126,15 @@ export async function POST(req: NextRequest) {
       html += `<tr><td style="padding:6px 12px;font-weight:bold;background:#f0f4f8;border:1px solid #ccdcee">${label}</td><td style="padding:6px 12px;border:1px solid #ccdcee">${v}</td></tr>`
     }
     html += '</table>'
-    if (attachments.length) {
-      html += `<p style="margin-top:1em">${attachments.length} bilde(r) er vedlagt.</p>`
+
+    if (driveLinks.length) {
+      html += `<h3 style="margin-top:1.5em">Bilder (Google Drive)</h3><ul>`
+      driveLinks.forEach((link, i) => {
+        html += `<li><a href="${link}">Bilde ${i + 1}</a></li>`
+      })
+      html += '</ul>'
+    } else if (attachments.length) {
+      html += `<p style="margin-top:1em">${attachments.length} bilde(r) er vedlagt som e-postvedlegg.</p>`
     }
 
     // --- TELEGRAM ---
@@ -82,8 +145,13 @@ export async function POST(req: NextRequest) {
       const label = labelMap[k] ?? k
       tgText += `<b>${label}:</b> ${v}\n`
     }
-    if (attachments.length) {
-      tgText += `\n📷 ${attachments.length} bilde(r) lastet opp`
+    if (driveLinks.length) {
+      tgText += `\n📷 <b>Bilder (${driveLinks.length} stk):</b>\n`
+      driveLinks.forEach((link, i) => {
+        tgText += `<a href="${link}">Bilde ${i + 1}</a>\n`
+      })
+    } else if (attachments.length) {
+      tgText += `\n📷 ${attachments.length} bilde(r) lastet opp (kun e-post)`
     }
 
     // Send parallelt

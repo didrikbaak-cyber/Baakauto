@@ -248,7 +248,7 @@ export default function CarForm({ type }: CarFormProps) {
           accept="image/*"
           multiple
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => { handleFiles(e.target.files); e.currentTarget.value = '' }}
         />
         {previews.length > 0 && (
           <div className="flex flex-wrap gap-3 mt-4">

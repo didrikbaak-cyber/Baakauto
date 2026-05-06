@@ -51,11 +51,29 @@ export default function CarForm({ type }: CarFormProps) {
 
   const handleFiles = useCallback((newFiles: FileList | null) => {
     if (!newFiles) return
-    const arr = Array.from(newFiles)
-    setFiles((prev) => [...prev, ...arr])
+    const MAX_FILES = 10
+    const MAX_SIZE_MB = 8
+    const arr = Array.from(newFiles).filter((file) => {
+      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        alert(`"${file.name}" er for stor (maks ${MAX_SIZE_MB}MB per bilde).`)
+        return false
+      }
+      return true
+    })
+    setFiles((prev) => {
+      const combined = [...prev, ...arr]
+      if (combined.length > MAX_FILES) {
+        alert(`Maks ${MAX_FILES} bilder tillatt.`)
+        return prev.slice(0, MAX_FILES)
+      }
+      return combined.slice(0, MAX_FILES)
+    })
     arr.forEach((file) => {
       const reader = new FileReader()
-      reader.onload = (e) => setPreviews((prev) => [...prev, e.target?.result as string])
+      reader.onload = (e) => setPreviews((prev) => {
+        const combined = [...prev, e.target?.result as string]
+        return combined.slice(0, MAX_FILES)
+      })
       reader.readAsDataURL(file)
     })
   }, [])
@@ -222,7 +240,7 @@ export default function CarForm({ type }: CarFormProps) {
         >
           <div className="text-3xl mb-2">📷</div>
           <p className="text-sm text-[#5a7a9a]">Klikk for å laste opp, eller dra og slipp</p>
-          <p className="text-xs text-[#5a7a9a] mt-1">JPG, PNG — flere bilder støttes</p>
+          <p className="text-xs text-[#5a7a9a] mt-1">JPG, PNG — maks 10 bilder, 8MB per bilde</p>
         </div>
         <input
           ref={fileInputRef}

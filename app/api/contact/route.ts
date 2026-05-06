@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
-import { google } from 'googleapis'
-import { Readable } from 'stream'
 
 const labelMap: Record<string, string> = {
   merke: 'Merke',
@@ -29,48 +27,54 @@ async function sendTelegram(text: string) {
   })
 }
 
-async function uploadToDrive(
-  filename: string,
+async function uploadToCloudinary(
   buffer: Buffer,
-  mimeType: string,
-  folderId: string
+  filename: string,
+  mimeType: string
 ): Promise<string | null> {
   try {
-    const keyJson = JSON.parse(
-      Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64!, 'base64').toString('utf-8')
-    )
-    const auth = new google.auth.GoogleAuth({
-      credentials: keyJson,
-      scopes: ['https://www.googleapis.com/auth/drive'],
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME
+    const apiKey = process.env.CLOUDINARY_API_KEY
+    const apiSecret = process.env.CLOUDINARY_API_SECRET
+    if (!cloudName || !apiKey || !apiSecret) return null
+
+    const base64 = buffer.toString('base64')
+    const dataUri = `data:${mimeType};base64,${base64}`
+
+    const formData = new FormData()
+    formData.append('file', dataUri)
+    formData.append('upload_preset', 'unsigned_baak') // fallback
+    formData.append('folder', 'baak-auto')
+    formData.append('public_id', `${Date.now()}-${filename.replace(/\.[^.]+$/, '')}`)
+
+    // Signed upload
+    const timestamp = Math.round(Date.now() / 1000)
+    const publicId = `baak-auto/${Date.now()}-${filename.replace(/\.[^.]+$/, '')}`
+    const strToSign = `folder=baak-auto&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
+    const encoder = new TextEncoder()
+    const data = encoder.encode(strToSign)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+
+    const fd = new FormData()
+    fd.append('file', dataUri)
+    fd.append('api_key', apiKey)
+    fd.append('timestamp', String(timestamp))
+    fd.append('signature', signature)
+    fd.append('folder', 'baak-auto')
+    fd.append('public_id', publicId)
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: 'POST',
+      body: fd,
     })
 
-    const drive = google.drive({ version: 'v3', auth })
-
-    const res = await drive.files.create({
-      requestBody: {
-        name: filename,
-        parents: [folderId],
-      },
-      media: {
-        mimeType,
-        body: Readable.from(buffer),
-      },
-      fields: 'id',
-      supportsAllDrives: true,
-    })
-
-    const fileId = res.data.id!
-
-    // Gjør filen tilgjengelig for alle med lenken
-    await drive.permissions.create({
-      fileId,
-      requestBody: { role: 'reader', type: 'anyone' },
-      supportsAllDrives: true,
-    })
-
-    return `https://drive.google.com/file/d/${fileId}/view`
+    const json = await res.json() as { secure_url?: string; error?: { message: string } }
+    if (json.error) throw new Error(json.error.message)
+    return json.secure_url ?? null
   } catch (err) {
-    console.error('[Google Drive upload]', err)
+    console.error('[Cloudinary upload]', err)
     return null
   }
 }
@@ -89,20 +93,15 @@ export async function POST(req: NextRequest) {
 
     const attachments: { filename: string; content: Buffer }[] = []
     const bilderEntries = data.getAll('bilder')
-
-    // Last opp til Google Drive
-    const driveLinks: string[] = []
-    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID
+    const imageLinks: string[] = []
 
     for (const entry of bilderEntries) {
       if (entry instanceof File && entry.size > 0) {
         const buf = Buffer.from(await entry.arrayBuffer())
         attachments.push({ filename: entry.name, content: buf })
 
-        if (folderId) {
-          const link = await uploadToDrive(entry.name, buf, entry.type || 'image/jpeg', folderId)
-          if (link) driveLinks.push(link)
-        }
+        const link = await uploadToCloudinary(buf, entry.name, entry.type || 'image/jpeg')
+        if (link) imageLinks.push(link)
       }
     }
 
@@ -129,10 +128,10 @@ export async function POST(req: NextRequest) {
     }
     html += '</table>'
 
-    if (driveLinks.length) {
-      html += `<h3 style="margin-top:1.5em">Bilder (Google Drive)</h3><ul>`
-      driveLinks.forEach((link, i) => {
-        html += `<li><a href="${link}">Bilde ${i + 1}</a></li>`
+    if (imageLinks.length) {
+      html += `<h3 style="margin-top:1.5em">Bilder</h3><ul>`
+      imageLinks.forEach((link, i) => {
+        html += `<li><a href="${link}">Bilde ${i + 1}</a> &nbsp;<img src="${link}" style="max-width:300px;display:block;margin-top:4px"></li>`
       })
       html += '</ul>'
     } else if (attachments.length) {
@@ -147,18 +146,17 @@ export async function POST(req: NextRequest) {
       const label = labelMap[k] ?? k
       tgText += `<b>${label}:</b> ${v}\n`
     }
-    if (driveLinks.length) {
-      tgText += `\n📷 <b>Bilder (${driveLinks.length} stk):</b>\n`
-      driveLinks.forEach((link, i) => {
+    if (imageLinks.length) {
+      tgText += `\n📷 <b>Bilder (${imageLinks.length} stk):</b>\n`
+      imageLinks.forEach((link, i) => {
         tgText += `<a href="${link}">Bilde ${i + 1}</a>\n`
       })
     } else if (attachments.length) {
-      tgText += `\n📷 ${attachments.length} bilde(r) lastet opp (kun e-post)`
+      tgText += `\n📷 ${attachments.length} bilde(r) vedlagt på e-post`
     }
 
     // Send parallelt
     await Promise.allSettled([
-      // E-post (kun hvis SMTP er konfigurert)
       process.env.SMTP_USER
         ? nodemailer.createTransport({
             host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
@@ -173,7 +171,6 @@ export async function POST(req: NextRequest) {
             attachments,
           })
         : Promise.resolve(),
-      // Telegram
       sendTelegram(tgText),
     ])
 

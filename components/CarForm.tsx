@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
 
 type FormType = 'innbytte' | 'selg'
 
@@ -49,7 +49,7 @@ export default function CarForm({ type }: CarFormProps) {
     setErrors((err) => ({ ...err, [field]: undefined }))
   }
 
-  const handleFiles = useCallback((newFiles: FileList | null) => {
+  const handleFiles = (newFiles: FileList | null) => {
     if (!newFiles) return
     const MAX_FILES = 10
     const MAX_SIZE_MB = 8
@@ -60,23 +60,32 @@ export default function CarForm({ type }: CarFormProps) {
       }
       return true
     })
-    setFiles((prev) => {
-      const combined = [...prev, ...arr]
-      if (combined.length > MAX_FILES) {
+    if (!arr.length) return
+
+    setFiles((prevFiles) => {
+      const combined = [...prevFiles, ...arr].slice(0, MAX_FILES)
+      if (prevFiles.length + arr.length > MAX_FILES) {
         alert(`Maks ${MAX_FILES} bilder tillatt.`)
-        return prev.slice(0, MAX_FILES)
       }
-      return combined.slice(0, MAX_FILES)
-    })
-    arr.forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = (e) => setPreviews((prev) => {
-        const combined = [...prev, e.target?.result as string]
-        return combined.slice(0, MAX_FILES)
+
+      // Les previews basert på eksakt kombinasjon
+      const newPreviews: string[] = []
+      let loaded = 0
+      arr.slice(0, MAX_FILES - prevFiles.length).forEach((file) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          newPreviews.push(e.target?.result as string)
+          loaded++
+          if (loaded === arr.slice(0, MAX_FILES - prevFiles.length).length) {
+            setPreviews((prevPreviews) => [...prevPreviews, ...newPreviews].slice(0, MAX_FILES))
+          }
+        }
+        reader.readAsDataURL(file)
       })
-      reader.readAsDataURL(file)
+
+      return combined
     })
-  }, [])
+  }
 
   const removeFile = (i: number) => {
     setFiles((prev) => prev.filter((_, idx) => idx !== i))

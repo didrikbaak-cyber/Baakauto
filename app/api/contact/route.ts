@@ -36,11 +36,11 @@ async function uploadToDrive(
   folderId: string
 ): Promise<string | null> {
   try {
+    const keyJson = JSON.parse(
+      Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64!, 'base64').toString('utf-8')
+    )
     const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
+      credentials: keyJson,
       scopes: ['https://www.googleapis.com/auth/drive'],
     })
 

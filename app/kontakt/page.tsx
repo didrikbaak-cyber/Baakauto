@@ -118,8 +118,32 @@ export default function KontaktPage() {
             </div>
           </div>
 
-          {/* RIGHT: Kontaktskjema */}
-          <ContactForm />
+          {/* RIGHT: Profilkort + Kontaktskjema */}
+          <div className="space-y-6">
+            <div className="bg-white border border-[#ccdcee] rounded-2xl p-6 flex items-center gap-5">
+              <div className="relative w-20 h-20 flex-shrink-0">
+                <Image
+                  src="/albert.jpg"
+                  alt="Albert Baak — Daglig leder"
+                  fill
+                  className="object-cover rounded-full"
+                  sizes="80px"
+                />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#2471c8] mb-0.5">Daglig leder</p>
+                <h3 className="text-lg font-extrabold text-[#1a3a5c]">Albert Baak</h3>
+                <p className="text-sm text-[#5a7a9a] mt-1">Ta gjerne kontakt direkte — jeg svarer raskt!</p>
+                <a
+                  href="tel:+4747680395"
+                  className="inline-flex items-center gap-1.5 mt-2 text-sm font-semibold text-[#1e5fa8] hover:text-[#2471c8] transition-colors"
+                >
+                  📞 47 68 03 95
+                </a>
+              </div>
+            </div>
+            <ContactForm />
+          </div>
         </div>
       </section>
     </>

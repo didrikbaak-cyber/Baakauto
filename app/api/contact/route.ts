@@ -27,87 +27,18 @@ async function sendTelegram(text: string) {
   })
 }
 
-async function uploadToCloudinary(
-  buffer: Buffer,
-  filename: string,
-  mimeType: string
-): Promise<string | null> {
-  try {
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME
-    const apiKey = process.env.CLOUDINARY_API_KEY
-    const apiSecret = process.env.CLOUDINARY_API_SECRET
-    if (!cloudName || !apiKey || !apiSecret) return null
-
-    const base64 = buffer.toString('base64')
-    const dataUri = `data:${mimeType};base64,${base64}`
-
-    const timestamp = Math.round(Date.now() / 1000)
-    const safeName = filename.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_')
-    const publicId = `baak-auto/${timestamp}-${safeName}`
-
-    // Cloudinary signature: params alphabetically sorted, then + apiSecret
-    const strToSign = `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`
-    const encoder = new TextEncoder()
-    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(strToSign))
-    const signature = Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-
-    const fd = new FormData()
-    fd.append('file', dataUri)
-    fd.append('api_key', apiKey)
-    fd.append('timestamp', String(timestamp))
-    fd.append('signature', signature)
-    fd.append('public_id', publicId)
-
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-      method: 'POST',
-      body: fd,
-    })
-
-    const json = await res.json() as { secure_url?: string; error?: { message: string } }
-    if (json.error) {
-      console.error('[Cloudinary error]', json.error.message)
-      return null
-    }
-    return json.secure_url ?? null
-  } catch (err) {
-    console.error('[Cloudinary upload]', err)
-    return null
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
-    const data = await req.formData()
-    const type = data.get('type') as string
+    const body = await req.json() as Record<string, unknown>
+    const type = body.type as string
+    const imageUrls: string[] = Array.isArray(body.imageUrls) ? body.imageUrls : []
 
     const fields: Record<string, string> = {}
-    for (const [key, val] of data.entries()) {
-      if (key !== 'bilder' && typeof val === 'string') {
-        fields[key] = val
+    for (const [k, v] of Object.entries(body)) {
+      if (k !== 'type' && k !== 'imageUrls' && typeof v === 'string' && v) {
+        fields[k] = v
       }
     }
-
-    const attachments: { filename: string; content: Buffer }[] = []
-    const bilderEntries = data.getAll('bilder')
-    const imageLinks: string[] = []
-
-    const uploadPromises: Promise<void>[] = []
-    for (const entry of bilderEntries) {
-      if (entry instanceof File && entry.size > 0) {
-        const buf = Buffer.from(await entry.arrayBuffer())
-        attachments.push({ filename: entry.name, content: buf })
-        const name = entry.name
-        const mime = entry.type || 'image/jpeg'
-        uploadPromises.push(
-          uploadToCloudinary(buf, name, mime).then((link) => {
-            if (link) imageLinks.push(link)
-          })
-        )
-      }
-    }
-    await Promise.allSettled(uploadPromises)
 
     const subjectMap: Record<string, string> = {
       innbytte: 'Ny innbytteforespørsel',
@@ -126,40 +57,31 @@ export async function POST(req: NextRequest) {
     // --- E-POST ---
     let html = `<h2>${subject}</h2><table style="border-collapse:collapse;width:100%">`
     for (const [k, v] of Object.entries(fields)) {
-      if (k === 'type' || !v) continue
       const label = labelMap[k] ?? k
       html += `<tr><td style="padding:6px 12px;font-weight:bold;background:#f0f4f8;border:1px solid #ccdcee">${label}</td><td style="padding:6px 12px;border:1px solid #ccdcee">${v}</td></tr>`
     }
     html += '</table>'
-
-    if (imageLinks.length) {
+    if (imageUrls.length) {
       html += `<h3 style="margin-top:1.5em">Bilder</h3><ul>`
-      imageLinks.forEach((link, i) => {
-        html += `<li><a href="${link}">Bilde ${i + 1}</a> &nbsp;<img src="${link}" style="max-width:300px;display:block;margin-top:4px"></li>`
+      imageUrls.forEach((url, i) => {
+        html += `<li><a href="${url}">Bilde ${i + 1}</a><br><img src="${url}" style="max-width:300px;margin-top:4px"></li>`
       })
       html += '</ul>'
-    } else if (attachments.length) {
-      html += `<p style="margin-top:1em">${attachments.length} bilde(r) er vedlagt som e-postvedlegg.</p>`
     }
 
     // --- TELEGRAM ---
-    let tgText = `${emoji} <b>${subject}</b>\n`
-    tgText += `━━━━━━━━━━━━━━━━\n`
+    let tgText = `${emoji} <b>${subject}</b>\n━━━━━━━━━━━━━━━━\n`
     for (const [k, v] of Object.entries(fields)) {
-      if (k === 'type' || !v) continue
       const label = labelMap[k] ?? k
       tgText += `<b>${label}:</b> ${v}\n`
     }
-    if (imageLinks.length) {
-      tgText += `\n📷 <b>Bilder (${imageLinks.length} stk):</b>\n`
-      imageLinks.forEach((link, i) => {
-        tgText += `<a href="${link}">Bilde ${i + 1}</a>\n`
+    if (imageUrls.length) {
+      tgText += `\n📷 <b>Bilder (${imageUrls.length} stk):</b>\n`
+      imageUrls.forEach((url, i) => {
+        tgText += `<a href="${url}">Bilde ${i + 1}</a>\n`
       })
-    } else if (attachments.length) {
-      tgText += `\n📷 ${attachments.length} bilde(r) vedlagt på e-post`
     }
 
-    // Send parallelt
     await Promise.allSettled([
       process.env.SMTP_USER
         ? nodemailer.createTransport({
@@ -172,7 +94,6 @@ export async function POST(req: NextRequest) {
             to: 'albert@baakauto.no',
             subject,
             html,
-            attachments,
           })
         : Promise.resolve(),
       sendTelegram(tgText),

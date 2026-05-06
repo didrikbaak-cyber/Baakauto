@@ -2,6 +2,25 @@
 
 import { useState, useRef } from 'react'
 
+const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!
+const UPLOAD_PRESET = 'baak-auto-unsigned'
+
+async function uploadImageToCloudinary(file: File): Promise<string | null> {
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('upload_preset', UPLOAD_PRESET)
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: 'POST',
+      body: fd,
+    })
+    const json = await res.json() as { secure_url?: string }
+    return json.secure_url ?? null
+  } catch {
+    return null
+  }
+}
+
 type FormType = 'innbytte' | 'selg'
 
 interface CarFormProps {
@@ -108,12 +127,18 @@ export default function CarForm({ type }: CarFormProps) {
     setStatus('sending')
 
     try {
-      const data = new FormData()
-      Object.entries(form).forEach(([k, v]) => data.append(k, v))
-      data.append('type', type)
-      files.forEach((f) => data.append('bilder', f))
+      // Last opp bilder direkte til Cloudinary fra nettleseren
+      const imageUrls = (
+        await Promise.all(files.map((f) => uploadImageToCloudinary(f)))
+      ).filter((url): url is string => url !== null)
 
-      const res = await fetch('/api/contact', { method: 'POST', body: data })
+      // Send kun tekst + URLs til API
+      const payload = { ...form, type, imageUrls }
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
       if (!res.ok) throw new Error()
       setStatus('success')
       setForm(emptyForm)
